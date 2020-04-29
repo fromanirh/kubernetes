@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/volume"
@@ -51,6 +52,20 @@ const (
 	// per image stored in the node status.
 	MaxNamesPerImageInNodeStatus = 5
 )
+
+func fillNUMANodeCapacity(capacity v1.ResourceList) {
+	info, err := topology.GetNUMANodeInfo()
+
+	if err != nil {
+		klog.Warningf("Can't get NUMANode info: %v", err)
+		return
+	}
+
+	for node, cpuSet := range info {
+		numaKey := fmt.Sprintf("numa%d/cpu", node)
+		capacity[v1.ResourceName(numaKey)] = *resource.NewQuantity(int64(cpuSet.Size()), resource.DecimalSI)
+	}
+}
 
 // Setter modifies the node in-place, and returns an error if the modification failed.
 // Setters may partially mutate the node before returning an error.
@@ -287,6 +302,9 @@ func MachineInfo(nodeName string,
 			for rName, rCap := range cadvisor.CapacityFromMachineInfo(info) {
 				node.Status.Capacity[rName] = rCap
 			}
+
+			// TODO add this funcionality into cadvisor.CapacityFromMachineInfo
+			fillNUMANodeCapacity(node.Status.Capacity)
 
 			if podsPerCore > 0 {
 				node.Status.Capacity[v1.ResourcePods] = *resource.NewQuantity(

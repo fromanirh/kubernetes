@@ -86,7 +86,9 @@ func getCPUsPerNUMANode(nodeNum int) ([]int, error) {
 	if err != nil {
 		return nil, err
 	}
-	return cpus.ToSlice(), nil
+	ret := cpus.ToSlice()
+	framework.Logf("CPUS on NUMA node %d: %v", nodeNum, ret)
+	return ret, nil
 }
 
 func getCPUToNUMANodeMapFromEnv(f *framework.Framework, pod *v1.Pod, cnt *v1.Container, environ map[string]string, numaNodes int) (map[int]int, error) {
@@ -115,7 +117,9 @@ func getCPUToNUMANodeMapFromEnv(f *framework.Framework, pod *v1.Pod, cnt *v1.Con
 		if err != nil {
 			return nil, err
 		}
-		cpusPerNUMA[numaNode] = cpus.ToSlice()
+		ret := cpus.ToSlice()
+		framework.Logf("CPUS on NUMA node %d: %v", numaNode, ret)
+		cpusPerNUMA[numaNode] = ret
 	}
 
 	// CPU IDs -> NUMA Node ID

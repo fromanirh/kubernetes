@@ -109,6 +109,9 @@ type ManagerImpl struct {
 	// devicesToReuse contains devices that can be reused as they have been allocated to
 	// init containers.
 	devicesToReuse PodReusableDevices
+
+	// Store resources per NUMA node
+	topologyResources map[int64]sets.String
 }
 
 type endpointInfo struct {
@@ -155,6 +158,7 @@ func newManagerImpl(socketPath string, numaNodeInfo cputopology.NUMANodeInfo, to
 		numaNodes:             numaNodes,
 		topologyAffinityStore: topologyAffinityStore,
 		devicesToReuse:        make(PodReusableDevices),
+		topologyResources:     make(map[int64]sets.String),
 	}
 	manager.callback = manager.genericDeviceUpdateCallback
 
@@ -182,6 +186,15 @@ func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, devices [
 			m.healthyDevices[resourceName].Insert(dev.ID)
 		} else {
 			m.unhealthyDevices[resourceName].Insert(dev.ID)
+		}
+		// update topologyResources
+		if dev.Topology != nil {
+			for _, node := range dev.Topology.Nodes {
+				if m.topologyResources[node.ID] == nil {
+					m.topologyResources[node.ID] = sets.NewString()
+				}
+				m.topologyResources[node.ID].Insert(resourceName)
+			}
 		}
 	}
 	m.mutex.Unlock()
@@ -555,6 +568,22 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 			unhealthyCount := *resource.NewQuantity(int64(devices.Len()), resource.DecimalSI)
 			capacityCount.Add(unhealthyCount)
 			capacity[v1.ResourceName(resourceName)] = capacityCount
+		}
+	}
+	for nodeid, resources := range m.topologyResources {
+		for resourceName := range resources {
+			resourceNameWithTopology := fmt.Sprintf("numa%d/%s", nodeid, resourceName)
+			if _, ok := m.healthyDevices[resourceName]; ok {
+				allocatableCount := *resource.NewQuantity(int64(m.healthyDevices[resourceName].Len()), resource.DecimalSI)
+				allocatable[v1.ResourceName(resourceNameWithTopology)] = allocatableCount
+				capacity[v1.ResourceName(resourceNameWithTopology)] = allocatableCount
+			}
+			if _, ok := m.unhealthyDevices[resourceName]; ok {
+				capacityCount := capacity[v1.ResourceName(resourceName)]
+				unhealthyCount := *resource.NewQuantity(int64(m.unhealthyDevices[resourceName].Len()), resource.DecimalSI)
+				capacityCount.Add(unhealthyCount)
+				capacity[v1.ResourceName(resourceNameWithTopology)] = capacityCount
+			}
 		}
 	}
 	m.mutex.Unlock()
