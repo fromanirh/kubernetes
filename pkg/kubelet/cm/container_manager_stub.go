@@ -125,6 +125,10 @@ func (cm *containerManagerStub) UpdateAllocatedDevices() {
 	return
 }
 
+func (cm *containerManagerStub) GetNUMACapacity() (v1.ResourceList, v1.ResourceList) {
+	return nil, nil
+}
+
 func NewStubContainerManager() ContainerManager {
 	return &containerManagerStub{shouldResetExtendedResourceCapacity: false}
 }

@@ -39,7 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/volume"
@@ -52,20 +51,6 @@ const (
 	// per image stored in the node status.
 	MaxNamesPerImageInNodeStatus = 5
 )
-
-func fillNUMANodeCapacity(capacity v1.ResourceList) {
-	info, err := topology.GetNUMANodeInfo()
-
-	if err != nil {
-		klog.Warningf("Can't get NUMANode info: %v", err)
-		return
-	}
-
-	for node, cpuSet := range info {
-		numaKey := fmt.Sprintf("numa%d/cpu", node)
-		capacity[v1.ResourceName(numaKey)] = *resource.NewQuantity(int64(cpuSet.Size()), resource.DecimalSI)
-	}
-}
 
 // Setter modifies the node in-place, and returns an error if the modification failed.
 // Setters may partially mutate the node before returning an error.
@@ -273,6 +258,7 @@ func MachineInfo(nodeName string,
 	devicePluginResourceCapacityFunc func() (v1.ResourceList, v1.ResourceList, []string), // typically Kubelet.containerManager.GetDevicePluginResourceCapacity
 	nodeAllocatableReservationFunc func() v1.ResourceList, // typically Kubelet.containerManager.GetNodeAllocatableReservation
 	recordEventFunc func(eventType, event, message string), // typically Kubelet.recordEvent
+	numaResourceCapacityFunc func() (v1.ResourceList, v1.ResourceList), // tipically Kubelet.containerManger.GetNUMACapacity
 ) Setter {
 	return func(node *v1.Node) error {
 		// Note: avoid blindly overwriting the capacity in case opaque
@@ -284,6 +270,9 @@ func MachineInfo(nodeName string,
 		var devicePluginAllocatable v1.ResourceList
 		var devicePluginCapacity v1.ResourceList
 		var removedDevicePlugins []string
+
+		var NUMAAllocatable v1.ResourceList
+		var NUMACapacity v1.ResourceList
 
 		// TODO: Post NotReady if we cannot get MachineInfo from cAdvisor. This needs to start
 		// cAdvisor locally, e.g. for test-cmd.sh, and in integration test.
@@ -302,9 +291,6 @@ func MachineInfo(nodeName string,
 			for rName, rCap := range cadvisor.CapacityFromMachineInfo(info) {
 				node.Status.Capacity[rName] = rCap
 			}
-
-			// TODO add this funcionality into cadvisor.CapacityFromMachineInfo
-			fillNUMANodeCapacity(node.Status.Capacity)
 
 			if podsPerCore > 0 {
 				node.Status.Capacity[v1.ResourcePods] = *resource.NewQuantity(
@@ -356,6 +342,13 @@ func MachineInfo(nodeName string,
 				// node status.
 				node.Status.Capacity[v1.ResourceName(removedResource)] = *resource.NewQuantity(int64(0), resource.DecimalSI)
 			}
+
+			NUMACapacity, NUMAAllocatable = numaResourceCapacityFunc()
+			if NUMACapacity != nil {
+				for k, v := range NUMACapacity {
+					node.Status.Capacity[k] = v
+				}
+			}
 		}
 
 		// Set Allocatable.
@@ -404,6 +397,16 @@ func MachineInfo(nodeName string,
 				node.Status.Allocatable[v1.ResourceMemory] = allocatableMemory
 			}
 		}
+
+		if NUMAAllocatable != nil {
+			for k, v := range NUMAAllocatable {
+				if old, ok := node.Status.Allocatable[k]; !ok || old.Value() != v.Value() {
+					klog.V(2).Infof("Update allocatable for %s to %d", k, v.Value())
+				}
+				node.Status.Allocatable[k] = v
+			}
+		}
+
 		return nil
 	}
 }

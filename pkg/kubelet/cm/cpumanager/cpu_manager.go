@@ -77,6 +77,10 @@ type Manager interface {
 	// and is consulted to achieve NUMA aware resource alignment among this
 	// and other resource controllers.
 	GetTopologyHints(*v1.Pod, *v1.Container) map[string][]topologymanager.TopologyHint
+
+	// GetNUMAResourceCapacity returns the per-NUMA exclusive core capacity and
+	// the per-NUMA core allocatable
+	GetNUMAResourceCapacity() (topology.NUMANodeInfo, topology.NUMANodeInfo)
 }
 
 type manager struct {
@@ -116,6 +120,8 @@ type manager struct {
 
 	// stateFileDirectory holds the directory where the state file for checkpoints is held.
 	stateFileDirectory string
+
+	numaCapacity topology.NUMANodeInfo
 }
 
 var _ Manager = &manager{}
@@ -175,9 +181,20 @@ func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo
 		topology:                   topo,
 		nodeAllocatableReservation: nodeAllocatableReservation,
 		stateFileDirectory:         stateFileDirectory,
+		numaCapacity:               numaNodeInfo.Clone(),
 	}
 	manager.sourcesReady = &sourcesReadyStub{}
 	return manager, nil
+}
+
+func (m *manager) GetNUMAResourceCapacity() (topology.NUMANodeInfo, topology.NUMANodeInfo) {
+	// the capacity is determined by the machine info, doesn't depend on the policy
+	allocation := m.policy.GetNUMAAllocation()
+	if allocation == nil {
+		// the policy is not tracking allocation
+		allocation = m.numaCapacity.Clone()
+	}
+	return m.numaCapacity.Clone(), allocation
 }
 
 func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {

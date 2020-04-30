@@ -1002,3 +1002,23 @@ func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {
 func (cm *containerManagerImpl) UpdateAllocatedDevices() {
 	cm.deviceManager.UpdateAllocatedDevices()
 }
+
+func numaCPUResourceName(node int) v1.ResourceName {
+	return v1.ResourceName(fmt.Sprintf("numa%02d/%s-exclusive", node, string(v1.ResourceCPU)))
+}
+
+func (cm *containerManagerImpl) GetNUMACapacity() (v1.ResourceList, v1.ResourceList) {
+	capacity, allocation := cm.cpuManager.GetNUMAResourceCapacity()
+
+	var NUMAAllocation v1.ResourceList
+	for node, cpuSet := range allocation {
+		NUMAAllocation[numaCPUResourceName(node)] = *resource.NewQuantity(int64(cpuSet.Size()), resource.DecimalSI)
+	}
+
+	var NUMACapacity v1.ResourceList
+	for node, cpuSet := range capacity {
+		NUMACapacity[numaCPUResourceName(node)] = *resource.NewQuantity(int64(cpuSet.Size()), resource.DecimalSI)
+	}
+
+	return NUMACapacity, NUMAAllocation
+}

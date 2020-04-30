@@ -30,6 +30,14 @@ import (
 // that NUMANode.
 type NUMANodeInfo map[int]cpuset.CPUSet
 
+func (info NUMANodeInfo) Clone() NUMANodeInfo {
+	b := make(NUMANodeInfo)
+	for k, v := range info {
+		b[k] = v.Clone()
+	}
+	return b
+}
+
 // CPUDetails is a map from CPU ID to Core ID, Socket ID, and NUMA ID.
 type CPUDetails map[int]CPUInfo
 

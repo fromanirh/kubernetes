@@ -115,6 +115,10 @@ type ContainerManager interface {
 
 	// UpdateAllocatedDevices frees any Devices that are bound to terminated pods.
 	UpdateAllocatedDevices()
+
+	// GetNUMACapacity returns the per-NUMA capacity (amount of total resources),
+	// pre-NUMA allocatable (amount of free resources as reported by managers).
+	GetNUMACapacity() (v1.ResourceList, v1.ResourceList)
 }
 
 type NodeConfig struct {
