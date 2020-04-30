@@ -1003,22 +1003,26 @@ func (cm *containerManagerImpl) UpdateAllocatedDevices() {
 	cm.deviceManager.UpdateAllocatedDevices()
 }
 
-func numaCPUResourceName(node int) v1.ResourceName {
+func NUMACPUResourceName(node int) v1.ResourceName {
 	return v1.ResourceName(fmt.Sprintf("numa%02d/%s-exclusive", node, string(v1.ResourceCPU)))
 }
 
 func (cm *containerManagerImpl) GetNUMACapacity() (v1.ResourceList, v1.ResourceList) {
-	capacity, allocation := cm.cpuManager.GetNUMAResourceCapacity()
+	capacity, allocatable := cm.cpuManager.GetNUMAResourceCapacity()
 
-	var NUMAAllocation v1.ResourceList
-	for node, cpuSet := range allocation {
-		NUMAAllocation[numaCPUResourceName(node)] = *resource.NewQuantity(int64(cpuSet.Size()), resource.DecimalSI)
+	klog.V(3).Infof("NUMA cores resource allocatable: %v", allocatable)
+	NUMAAllocatable := make(v1.ResourceList)
+	for node, cpuSet := range allocatable {
+		NUMAAllocatable[NUMACPUResourceName(node)] = *resource.NewQuantity(int64(cpuSet.Size()), resource.DecimalSI)
 	}
+	klog.V(2).Infof("NUMA cores allocatable: %v", NUMAAllocatable)
 
-	var NUMACapacity v1.ResourceList
+	klog.V(3).Infof("NUMA cores resource capacity: %v", capacity)
+	NUMACapacity := make(v1.ResourceList)
 	for node, cpuSet := range capacity {
-		NUMACapacity[numaCPUResourceName(node)] = *resource.NewQuantity(int64(cpuSet.Size()), resource.DecimalSI)
+		NUMACapacity[NUMACPUResourceName(node)] = *resource.NewQuantity(int64(cpuSet.Size()), resource.DecimalSI)
 	}
+	klog.V(2).Infof("NUMA cores capacity: %v", NUMACapacity)
 
-	return NUMACapacity, NUMAAllocation
+	return NUMACapacity, NUMAAllocatable
 }

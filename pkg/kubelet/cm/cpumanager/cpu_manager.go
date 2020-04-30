@@ -189,12 +189,23 @@ func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo
 
 func (m *manager) GetNUMAResourceCapacity() (topology.NUMANodeInfo, topology.NUMANodeInfo) {
 	// the capacity is determined by the machine info, doesn't depend on the policy
+	m.Lock()
 	allocation := m.policy.GetNUMAAllocation()
+	m.Unlock()
+
+	capacity := m.numaCapacity.Clone()
 	if allocation == nil {
 		// the policy is not tracking allocation
-		allocation = m.numaCapacity.Clone()
+		return capacity, m.numaCapacity.Clone()
 	}
-	return m.numaCapacity.Clone(), allocation
+
+	allocatable := make(topology.NUMANodeInfo)
+	for numaNode, cpuSet := range capacity {
+		allocatableCpus := cpuSet.Difference(allocation[numaNode])
+		allocatable[numaNode] = allocatableCpus
+		klog.V(3).Infof("NUMA node %d allocatable CPUs %v over %v", numaNode, allocatableCpus, cpuSet)
+	}
+	return capacity, allocatable
 }
 
 func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {

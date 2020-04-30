@@ -289,13 +289,7 @@ func getUniqueCoreID(threads []int) (coreID int, err error) {
 	return min, nil
 }
 
-// GetNUMANodeInfo uses sysfs to return a map of NUMANode id to the list of
-// CPUs associated with that NUMANode.
-//
-// TODO: This is a temporary workaround until cadvisor provides this
-// information directly in machineInfo. We should remove this once this
-// information is available from cadvisor.
-func GetNUMANodeInfo() (NUMANodeInfo, error) {
+func getSystemNUMANodes() ([]int, error) {
 	// Get the possible NUMA nodes on this machine. If reading this file
 	// is not possible, this is not an error. Instead, we just return a
 	// nil NUMANodeInfo, indicating that no NUMA information is available
@@ -312,10 +306,25 @@ func GetNUMANodeInfo() (NUMANodeInfo, error) {
 		return nil, err
 	}
 
-	info := make(NUMANodeInfo)
+	return nodes.ToSlice(), nil
 
+}
+
+// GetNUMANodeInfo uses sysfs to return a map of NUMANode id to the list of
+// CPUs associated with that NUMANode.
+//
+// TODO: This is a temporary workaround until cadvisor provides this
+// information directly in machineInfo. We should remove this once this
+// information is available from cadvisor.
+func GetNUMANodeInfo() (NUMANodeInfo, error) {
+	nodes, err := getSystemNUMANodes()
+	if nodes == nil {
+		return nil, err
+	}
+
+	info := make(NUMANodeInfo)
 	// For each node...
-	for _, node := range nodes.ToSlice() {
+	for _, node := range nodes {
 		// Read the 'cpulist' of the NUMA node from sysfs.
 		path := fmt.Sprintf("/sys/devices/system/node/node%d/cpulist", node)
 		cpulist, err := ioutil.ReadFile(path)
@@ -333,4 +342,18 @@ func GetNUMANodeInfo() (NUMANodeInfo, error) {
 	}
 
 	return info, nil
+}
+
+func NewEmptyNUMANodeInfo() NUMANodeInfo {
+	nodes, _ := getSystemNUMANodes()
+	if nodes == nil {
+		nodes = []int{0}
+	}
+
+	info := make(NUMANodeInfo)
+	// For each node...
+	for _, node := range nodes {
+		info[node] = cpuset.CPUSet{}
+	}
+	return info
 }

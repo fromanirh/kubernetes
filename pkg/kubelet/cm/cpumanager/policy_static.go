@@ -79,6 +79,8 @@ type staticPolicy struct {
 	affinity topologymanager.Store
 	// set of CPUs to reuse across allocations in a pod
 	cpusToReuse map[string]cpuset.CPUSet
+	// per-NUMA core allocation
+	numaAllocation topology.NUMANodeInfo
 }
 
 // Ensure staticPolicy implements Policy interface
@@ -87,8 +89,8 @@ var _ Policy = &staticPolicy{}
 // NewStaticPolicy returns a CPU manager policy that does not change CPU
 // assignments for exclusively pinned guaranteed containers after the main
 // container process starts.
-func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reservedCPUs cpuset.CPUSet, affinity topologymanager.Store) (Policy, error) {
-	allCPUs := topology.CPUDetails.CPUs()
+func NewStaticPolicy(topo *topology.CPUTopology, numReservedCPUs int, reservedCPUs cpuset.CPUSet, affinity topologymanager.Store) (Policy, error) {
+	allCPUs := topo.CPUDetails.CPUs()
 	var reserved cpuset.CPUSet
 	if reservedCPUs.Size() > 0 {
 		reserved = reservedCPUs
@@ -98,7 +100,7 @@ func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reserv
 		//
 		// For example: Given a system with 8 CPUs available and HT enabled,
 		// if numReservedCPUs=2, then reserved={0,4}
-		reserved, _ = takeByTopology(topology, allCPUs, numReservedCPUs)
+		reserved, _ = takeByTopology(topo, allCPUs, numReservedCPUs)
 	}
 
 	if reserved.Size() != numReservedCPUs {
@@ -109,10 +111,11 @@ func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reserv
 	klog.Infof("[cpumanager] reserved %d CPUs (\"%s\") not available for exclusive assignment", reserved.Size(), reserved)
 
 	return &staticPolicy{
-		topology:    topology,
-		reserved:    reserved,
-		affinity:    affinity,
-		cpusToReuse: make(map[string]cpuset.CPUSet),
+		topology:       topo,
+		reserved:       reserved,
+		affinity:       affinity,
+		cpusToReuse:    make(map[string]cpuset.CPUSet),
+		numaAllocation: topology.NewEmptyNUMANodeInfo(),
 	}, nil
 }
 
@@ -238,6 +241,7 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 		}
 		s.SetCPUSet(string(pod.UID), container.Name, cpuset)
 		p.updateCPUsToReuse(pod, container, cpuset)
+		p.addToNUMAAllocation(cpuset)
 
 	}
 	// container belongs in the shared pool (nothing to do; use default cpuset)
@@ -250,6 +254,7 @@ func (p *staticPolicy) RemoveContainer(s state.State, podUID string, containerNa
 		s.Delete(podUID, containerName)
 		// Mutate the shared pool, adding released cpus.
 		s.SetDefaultCPUSet(s.GetDefaultCPUSet().Union(toRelease))
+		p.removeFromNUMAAllocation(toRelease)
 	}
 	return nil
 }
@@ -355,7 +360,29 @@ func (p *staticPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v
 }
 
 func (p *staticPolicy) GetNUMAAllocation() topology.NUMANodeInfo {
-	return nil
+	return p.numaAllocation.Clone()
+}
+
+func (p *staticPolicy) addToNUMAAllocation(cpus cpuset.CPUSet) {
+	for numaNodeID, _ := range p.numaAllocation {
+		nodeAllCpus := p.topology.CPUDetails.CPUsInNUMANodes(numaNodeID)
+		nodeCpus := cpus.Intersection(nodeAllCpus)
+		klog.Infof("[cpumanager] NUMA node %d adding cpus %v (%v)", numaNodeID, nodeCpus, nodeAllCpus)
+
+		alloc := p.numaAllocation[numaNodeID]
+		p.numaAllocation[numaNodeID] = alloc.Union(nodeCpus)
+	}
+}
+
+func (p *staticPolicy) removeFromNUMAAllocation(cpus cpuset.CPUSet) {
+	for numaNodeID, _ := range p.numaAllocation {
+		nodeAllCpus := p.topology.CPUDetails.CPUsInNUMANodes(numaNodeID)
+		nodeCpus := cpus.Intersection(nodeAllCpus)
+		klog.Infof("[cpumanager] NUMA node %d removing cpus %v (%v)", numaNodeID, nodeCpus, nodeAllCpus)
+
+		alloc := p.numaAllocation[numaNodeID]
+		p.numaAllocation[numaNodeID] = alloc.Difference(nodeCpus)
+	}
 }
 
 // generateCPUtopologyHints generates a set of TopologyHints given the set of

@@ -18,23 +18,16 @@ package e2enode
 
 import (
 	"fmt"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
-	//	"k8s.io/apimachinery/pkg/runtime"
-	//	testutils "k8s.io/kubernetes/test/utils"
 
 	"k8s.io/apimachinery/pkg/api/resource"
-	//	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	//	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	//	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
-	//	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
-	//	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	//	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	//	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -92,8 +85,7 @@ var _ = SIGDescribe("Resources per-NUMA [Serial] [Feature:TopologyManager][NodeB
 
 func runPodsAndCheckResourceNodes(fw *framework.Framework, numaNodes, numPods int, ctnAttrs []tmCtnAttribute) {
 
-	node := getLocalNode(fw)
-	checkPerNumaResourceCapacity(node, numaNodes)
+	checkPerNumaResourceCapacity(getLocalNode(fw), numaNodes)
 
 	var pods []*v1.Pod
 
@@ -106,7 +98,10 @@ func runPodsAndCheckResourceNodes(fw *framework.Framework, numaNodes, numPods in
 		pods = append(pods, pod)
 	}
 
-	checkPerNumaResourceConsumption(fw, node, numaNodes, pods)
+	// FIXME: giving the node status the time to catch up
+	time.Sleep(20 * time.Second)
+
+	checkPerNumaResourceConsumption(fw, getLocalNode(fw), numaNodes, pods)
 
 	for podID := 0; podID < numPods; podID++ {
 		pod := pods[podID]
@@ -119,8 +114,8 @@ func runPodsAndCheckResourceNodes(fw *framework.Framework, numaNodes, numPods in
 
 func checkPerNumaResourceCapacity(node *v1.Node, numaNodes int) {
 	for numaNode := 0; numaNode < numaNodes; numaNode++ {
-		resCpu := fmt.Sprintf("numa%d/%s", numaNode, string(v1.ResourceCPU))
-		cpuCap := node.Status.Capacity[v1.ResourceName(resCpu)]
+		resCpu := cm.NUMACPUResourceName(numaNode)
+		cpuCap := node.Status.Capacity[resCpu]
 		framework.Logf("%v -> %v", resCpu, cpuCap)
 		gomega.Expect(cpuCap.IsZero()).To(gomega.BeFalse(), "no CPU capacity reported for NUMA node %d", numaNode)
 	}
@@ -129,12 +124,18 @@ func checkPerNumaResourceCapacity(node *v1.Node, numaNodes int) {
 func checkPerNumaResourceConsumption(fw *framework.Framework, node *v1.Node, numaNodes int, pods []*v1.Pod) {
 	reqs := gatherPerNumaRequirements(fw, numaNodes, pods)
 
-	for numaNode, _ := range reqs {
-		resCpu := fmt.Sprintf("numa%d/%s", numaNode, string(v1.ResourceCPU))
-		cpuCap := node.Status.Capacity[v1.ResourceName(resCpu)]
-		cpuAlloc := node.Status.Allocatable[v1.ResourceName(resCpu)]
+	for numaNode, nodeReqs := range reqs {
+		resCpu := cm.NUMACPUResourceName(numaNode)
+		cpuCap := node.Status.Capacity[resCpu].DeepCopy()
+		cpuAlloc := node.Status.Allocatable[resCpu].DeepCopy()
+
 		framework.Logf("%v -> %v / %v", resCpu, cpuAlloc, cpuCap)
-		framework.ExpectEqual(cpuCap.Cmp(cpuAlloc), 1, "CPU capacity/allocation mismatch for NUMA node %d 0 alloc=%v cap=%v", numaNode, cpuAlloc, cpuCap)
+		framework.ExpectEqual(cpuCap.Cmp(cpuAlloc), 1, "CPU capacity/allocation mismatch for NUMA node %d alloc=%v cap=%v", numaNode, cpuAlloc, cpuCap)
+
+		cpuReq := nodeReqs[v1.ResourceCPU]
+		cpuUsed := cpuReq.DeepCopy()
+		cpuUsed.Add(cpuAlloc)
+		framework.ExpectEqual(cpuCap.Cmp(cpuUsed), 0, "CPU capacity/usage mismatch for NUMA node %d reqs=%v used=%v alloc=%v cap=%v", numaNode, cpuReq, cpuUsed, cpuAlloc, cpuCap)
 	}
 }
 
