@@ -42,6 +42,11 @@ func (m *mockProvider) GetDevices(podUID, containerName string) []*v1alpha1.Cont
 	return args.Get(0).([]*v1alpha1.ContainerDevices)
 }
 
+func (m *mockProvider) GetCPUs(podUID, containerName string) []int64 {
+	args := m.Called(podUID, containerName)
+	return args.Get(0).([]int64)
+}
+
 func (m *mockProvider) UpdateAllocatedDevices() {
 	m.Called()
 }
@@ -51,24 +56,30 @@ func TestListPodResources(t *testing.T) {
 	podNamespace := "pod-namespace"
 	podUID := types.UID("pod-uid")
 	containerName := "container-name"
+	numaID := int64(1)
 
 	devs := []*v1alpha1.ContainerDevices{
 		{
 			ResourceName: "resource",
 			DeviceIds:    []string{"dev0", "dev1"},
+			Topology:     &v1alpha1.TopologyInfo{Nodes: []*v1alpha1.NUMANode{{ID: numaID}}},
 		},
 	}
+
+	cpus := []int64{12, 23, 30}
 
 	for _, tc := range []struct {
 		desc             string
 		pods             []*v1.Pod
 		devices          []*v1alpha1.ContainerDevices
+		cpus             []int64
 		expectedResponse *v1alpha1.ListPodResourcesResponse
 	}{
 		{
 			desc:             "no pods",
 			pods:             []*v1.Pod{},
 			devices:          []*v1alpha1.ContainerDevices{},
+			cpus:             []int64{},
 			expectedResponse: &v1alpha1.ListPodResourcesResponse{},
 		},
 		{
@@ -90,6 +101,7 @@ func TestListPodResources(t *testing.T) {
 				},
 			},
 			devices: []*v1alpha1.ContainerDevices{},
+			cpus:    []int64{},
 			expectedResponse: &v1alpha1.ListPodResourcesResponse{
 				PodResources: []*v1alpha1.PodResources{
 					{
@@ -124,6 +136,7 @@ func TestListPodResources(t *testing.T) {
 				},
 			},
 			devices: devs,
+			cpus:    cpus,
 			expectedResponse: &v1alpha1.ListPodResourcesResponse{
 				PodResources: []*v1alpha1.PodResources{
 					{
@@ -133,6 +146,7 @@ func TestListPodResources(t *testing.T) {
 							{
 								Name:    containerName,
 								Devices: devs,
+								CpuIds:  cpus,
 							},
 						},
 					},
@@ -144,8 +158,9 @@ func TestListPodResources(t *testing.T) {
 			m := new(mockProvider)
 			m.On("GetPods").Return(tc.pods)
 			m.On("GetDevices", string(podUID), containerName).Return(tc.devices)
+			m.On("GetCPUs", string(podUID), containerName).Return(tc.cpus)
 			m.On("UpdateAllocatedDevices").Return()
-			server := NewPodResourcesServer(m, m)
+			server := NewPodResourcesServer(m, m, m)
 			resp, err := server.List(context.TODO(), &v1alpha1.ListPodResourcesRequest{})
 			if err != nil {
 				t.Errorf("want err = %v, got %q", nil, err)

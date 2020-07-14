@@ -29,6 +29,11 @@ type DevicesProvider interface {
 	UpdateAllocatedDevices()
 }
 
+// CPUsProvider knows how to provide the cpus used by the given container
+type CPUsProvider interface {
+	GetCPUs(podUID, containerName string) []int64
+}
+
 // PodsProvider knows how to provide the pods admitted by the node
 type PodsProvider interface {
 	GetPods() []*v1.Pod
@@ -38,14 +43,16 @@ type PodsProvider interface {
 type podResourcesServer struct {
 	podsProvider    PodsProvider
 	devicesProvider DevicesProvider
+	cpusProvider    CPUsProvider
 }
 
 // NewPodResourcesServer returns a PodResourcesListerServer which lists pods provided by the PodsProvider
 // with device information provided by the DevicesProvider
-func NewPodResourcesServer(podsProvider PodsProvider, devicesProvider DevicesProvider) v1alpha1.PodResourcesListerServer {
+func NewPodResourcesServer(podsProvider PodsProvider, devicesProvider DevicesProvider, cpusProvider CPUsProvider) v1alpha1.PodResourcesListerServer {
 	return &podResourcesServer{
 		podsProvider:    podsProvider,
 		devicesProvider: devicesProvider,
+		cpusProvider:    cpusProvider,
 	}
 }
 
@@ -66,6 +73,7 @@ func (p *podResourcesServer) List(ctx context.Context, req *v1alpha1.ListPodReso
 			pRes.Containers[j] = &v1alpha1.ContainerResources{
 				Name:    container.Name,
 				Devices: p.devicesProvider.GetDevices(string(pod.UID), container.Name),
+				CpuIds:  p.cpusProvider.GetCPUs(string(pod.UID), container.Name),
 			}
 		}
 		podResources[i] = &pRes
