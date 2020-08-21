@@ -85,13 +85,17 @@ func detectCoresPerSocket() int {
 	return coreCount
 }
 
-func detectSRIOVDevices() int {
+func countSRIOVDevices() (int, error) {
 	outData, err := exec.Command("/bin/sh", "-c", "ls /sys/bus/pci/devices/*/physfn | wc -w").Output()
-	framework.ExpectNoError(err)
+	if err != nil {
+		return -1, err
+	}
+	return strconv.Atoi(strings.TrimSpace(string(outData)))
+}
 
-	devCount, err := strconv.Atoi(strings.TrimSpace(string(outData)))
+func detectSRIOVDevices() int {
+	devCount, err := countSRIOVDevices()
 	framework.ExpectNoError(err)
-
 	return devCount
 }
 
@@ -383,7 +387,7 @@ func runTopologyManagerPositiveTest(f *framework.Framework, numPods int, ctnAttr
 		pod := pods[podID]
 		framework.Logf("deleting the pod %s/%s and waiting for container removal",
 			pod.Namespace, pod.Name)
-		deletePods(f, []string{pod.Name})
+		deletePodSyncByName(f, pod.Name)
 		waitForAllContainerRemoval(pod.Name, pod.Namespace)
 	}
 }
@@ -411,7 +415,7 @@ func runTopologyManagerNegativeTest(f *framework.Framework, numPods int, ctnAttr
 		framework.Failf("pod %s failed for wrong reason: %q", pod.Name, pod.Status.Reason)
 	}
 
-	deletePods(f, []string{pod.Name})
+	deletePodSyncByName(f, pod.Name)
 }
 
 func isTopologyAffinityError(pod *v1.Pod) bool {
