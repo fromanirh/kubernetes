@@ -150,7 +150,7 @@ func newManagerImpl(socketPath string, topology []cadvisorapi.Node, topologyAffi
 		healthyDevices:        make(map[string]sets.String),
 		unhealthyDevices:      make(map[string]sets.String),
 		allocatedDevices:      make(map[string]sets.String),
-		podDevices:            make(podDevices),
+		podDevices:            newPodDevices(),
 		numaNodes:             numaNodes,
 		topologyAffinityStore: topologyAffinityStore,
 		devicesToReuse:        make(PodReusableDevices),
@@ -397,7 +397,7 @@ func (m *ManagerImpl) UpdatePluginResources(node *schedulerframework.NodeInfo, a
 	defer m.mutex.Unlock()
 
 	// quick return if no pluginResources requested
-	if _, podRequireDevicePluginResource := m.podDevices[string(pod.UID)]; !podRequireDevicePluginResource {
+	if _, podRequireDevicePluginResource := m.podDevices.devs[string(pod.UID)]; !podRequireDevicePluginResource {
 		return nil
 	}
 
