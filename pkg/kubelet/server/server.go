@@ -65,7 +65,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/v1/validation"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/portforward"
@@ -181,9 +180,9 @@ func ListenAndServeKubeletReadOnlyServer(host HostInterface, resourceAnalyzer st
 }
 
 // ListenAndServePodResources initializes a gRPC server to serve the PodResources service
-func ListenAndServePodResources(socket string, podsProvider podresources.PodsProvider, devicesProvider podresources.DevicesProvider, cpusProvider podresources.CPUsProvider) {
+func ListenAndServePodResources(socket string, resourcesServer podresourcesapi.PodResourcesListerServer) {
 	server := grpc.NewServer()
-	podresourcesapi.RegisterPodResourcesListerServer(server, podresources.NewPodResourcesServer(podsProvider, devicesProvider, cpusProvider))
+	podresourcesapi.RegisterPodResourcesListerServer(server, resourcesServer)
 	l, err := util.CreateListener(socket)
 	if err != nil {
 		klog.Fatalf("Failed to create listener for podResources endpoint: %v", err)

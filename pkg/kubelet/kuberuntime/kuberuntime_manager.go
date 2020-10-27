@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -136,6 +137,9 @@ type kubeGenericRuntimeManager struct {
 
 	// Cache last per-container error message to reduce log spam
 	logReduction *logreduction.LogReduction
+
+	// Support for the podresources Watch() API
+	resourcesNotifier podresources.Notifier
 }
 
 // KubeGenericRuntime is a interface contains interfaces for container runtime and command.
@@ -174,6 +178,7 @@ func NewKubeGenericRuntimeManager(
 	legacyLogProvider LegacyLogProvider,
 	logManager logs.ContainerLogManager,
 	runtimeClassManager *runtimeclass.Manager,
+	resourcesNotifier podresources.Notifier,
 ) (KubeGenericRuntime, error) {
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
 		recorder:            recorder,
@@ -193,6 +198,7 @@ func NewKubeGenericRuntimeManager(
 		logManager:          logManager,
 		runtimeClassManager: runtimeClassManager,
 		logReduction:        logreduction.NewLogReduction(identicalErrorDelay),
+		resourcesNotifier:   resourcesNotifier,
 	}
 
 	typedVersion, err := kubeRuntimeManager.getTypedVersion()

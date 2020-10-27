@@ -19,6 +19,7 @@ option (gogoproto.goproto_unrecognized_all) = false;
 service PodResourcesLister {
     rpc List(ListPodResourcesRequest) returns (ListPodResourcesResponse) {}
     rpc GetAllocatableResources(AllocatableResourcesRequest) returns (AllocatableResourcesResponse) {}
+    rpc Watch(WatchPodResourcesRequest) returns (stream WatchPodResourcesResponse) {}
 }
 
 message AllocatableResourcesRequest {}
@@ -29,7 +30,7 @@ message AllocatableResourcesResponse {
     repeated int64 cpu_ids = 2;
 }
 
-// ListPodResourcesRequest is the request made to the PodResourcesLister service
+// ListPodResourcesRequest is the request made to the PodResources service
 message ListPodResourcesRequest {}
 
 // ListPodResourcesResponse is the response returned by List function
@@ -37,11 +38,27 @@ message ListPodResourcesResponse {
     repeated PodResources pod_resources = 1;
 }
 
+// WatchPodResourcesRequest is the request made to the Watch PodResourcesLister service
+message WatchPodResourcesRequest {}
+
+enum WatchPodAction {
+    ADDED = 0;
+    DELETED = 1;
+}
+
+// WatchPodResourcesResponse is the response returned by Watch function
+message WatchPodResourcesResponse {
+    WatchPodAction action = 1;
+    string uid = 2;
+    PodResources pod_resources = 3;
+}
+
 // PodResources contains information about the node resources assigned to a pod
 message PodResources {
     string name = 1;
     string namespace = 2;
     repeated ContainerResources containers = 3;
+    string resource_version = 4;
 }
 
 // ContainerResources contains information about the resources assigned to a container

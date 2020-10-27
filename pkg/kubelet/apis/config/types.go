@@ -363,6 +363,8 @@ type KubeletConfiguration struct {
 	Logging componentbaseconfig.LoggingConfiguration
 	// EnableSystemLogHandler enables /logs handler.
 	EnableSystemLogHandler bool
+	// EnablePodResourcesWatch enabled the notifications on the Watch() endpoint of the podresources API
+	EnablePodResourcesWatch bool
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet

@@ -301,6 +301,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.EnablePodResourcesWatch != nil {
+		in, out := &in.EnablePodResourcesWatch, &out.EnablePodResourcesWatch
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

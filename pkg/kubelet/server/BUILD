@@ -19,7 +19,6 @@ go_library(
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/v1/validation:go_default_library",
         "//pkg/features:go_default_library",
-        "//pkg/kubelet/apis/podresources:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/cri/streaming:go_default_library",
         "//pkg/kubelet/cri/streaming/portforward:go_default_library",

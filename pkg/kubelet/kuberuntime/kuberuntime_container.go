@@ -179,6 +179,9 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 		m.recordContainerEvent(pod, container, containerID, v1.EventTypeWarning, events.FailedToStartContainer, "Internal PreStartContainer hook failed: %v", s.Message())
 		return s.Message(), ErrPreStartHook
 	}
+
+	m.resourcesNotifier.StartContainer(pod, containerID, container.Name)
+
 	m.recordContainerEvent(pod, container, containerID, v1.EventTypeNormal, events.CreatedContainer, fmt.Sprintf("Created container %s", container.Name))
 
 	// Step 3: start the container.
@@ -641,6 +644,8 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 	} else {
 		klog.V(3).Infof("Container %q exited normally", containerID.String())
 	}
+
+	m.resourcesNotifier.StopContainer(pod, containerID.ID, containerSpec.Name)
 
 	return err
 }

@@ -58,6 +58,7 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	"k8s.io/klog/v2"
 	pluginwatcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
+	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
@@ -592,6 +593,9 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.containerLogManager = logs.NewStubContainerLogManager()
 	}
 
+	klog.Infof("podresources watch support: %v", kubeCfg.EnablePodResourcesWatch)
+	klet.resourcesServer, klet.resourcesNotifier = podresources.NewPodResourcesServer(klet.podManager, klet.containerManager, klet.containerManager, kubeCfg.EnablePodResourcesWatch)
+
 	runtime, err := kuberuntime.NewKubeGenericRuntimeManager(
 		kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
 		klet.livenessManager,
@@ -614,6 +618,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		kubeDeps.dockerLegacyService,
 		klet.containerLogManager,
 		klet.runtimeClassManager,
+		klet.resourcesNotifier,
 	)
 	if err != nil {
 		return nil, err
@@ -1134,6 +1139,12 @@ type Kubelet struct {
 
 	// Handles RuntimeClass objects for the Kubelet.
 	runtimeClassManager *runtimeclass.Manager
+
+	// TODO
+	resourcesServer podresourcesapi.PodResourcesListerServer
+
+	// TODO
+	resourcesNotifier podresources.Notifier
 }
 
 // ListPodStats is delegated to StatsProvider, which implements stats.Provider interface
@@ -2201,7 +2212,7 @@ func (kl *Kubelet) ListenAndServePodResources() {
 		klog.V(2).Infof("Failed to get local endpoint for PodResources endpoint: %v", err)
 		return
 	}
-	server.ListenAndServePodResources(socket, kl.podManager, kl.containerManager, kl.containerManager)
+	server.ListenAndServePodResources(socket, kl.resourcesServer)
 }
 
 // Delete the eligible dead container instances in a pod. Depending on the configuration, the latest dead containers may be kept around.

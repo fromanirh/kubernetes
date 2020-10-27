@@ -173,7 +173,8 @@ func TestListPodResources(t *testing.T) {
 			m.On("UpdateAllocatedDevices").Return()
 			m.On("GetAllCPUs").Return([]int64{})
 			m.On("GetAllDevices").Return(map[string]map[string]pluginapi.Device{})
-			server := NewPodResourcesServer(m, m, m)
+			/* we test the Watch support using the e2e tests */
+			server, _ := NewPodResourcesServer(m, m, m, false)
 			resp, err := server.List(context.TODO(), &podresourcesapi.ListPodResourcesRequest{})
 			if err != nil {
 				t.Errorf("want err = %v, got %q", nil, err)
@@ -305,7 +306,8 @@ func TestAllocatableResources(t *testing.T) {
 			m.On("UpdateAllocatedDevices").Return()
 			m.On("GetAllDevices").Return(tc.allDevices)
 			m.On("GetAllCPUs").Return(tc.allCPUs)
-			server := NewPodResourcesServer(m, m, m)
+			/* we test the Watch support using the e2e tests */
+			server, _ := NewPodResourcesServer(m, m, m, false)
 
 			resp, err := server.GetAllocatableResources(context.TODO(), &podresourcesapi.AllocatableResourcesRequest{})
 			if err != nil {

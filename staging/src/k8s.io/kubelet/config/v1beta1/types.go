@@ -803,6 +803,10 @@ type KubeletConfiguration struct {
 	// Default: true
 	// +optional
 	EnableSystemLogHandler *bool `json:"enableSystemLogHandler,omitempty"`
+	// enablePodResourcesWatch enables the resource allocations notifications via the podresources APIs.
+	// Default: true
+	// +optional
+	EnablePodResourcesWatch *bool `json:"enablePodResourcesWatch,omitempty"`
 }
 
 type KubeletAuthorizationMode string
