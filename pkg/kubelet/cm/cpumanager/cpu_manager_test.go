@@ -116,6 +116,10 @@ func (p *mockPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v1.
 	return nil
 }
 
+func (p *mockPolicy) GetAssignableCPUs(m state.State) cpuset.CPUSet {
+	return cpuset.NewCPUSet()
+}
+
 type mockRuntimeService struct {
 	err error
 }

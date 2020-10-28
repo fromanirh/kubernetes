@@ -81,6 +81,9 @@ type Manager interface {
 	// GetCPUs implements the podresources.CPUsProvider interface to provide allocated
 	// cpus for the container
 	GetCPUs(podUID, containerName string) []int64
+
+	// GetAllCPUs provides the ordered IDs of all the online CPUs found on the node.
+	GetAllCPUs() []int64
 }
 
 type manager struct {
@@ -120,6 +123,9 @@ type manager struct {
 
 	// stateFileDirectory holds the directory where the state file for checkpoints is held.
 	stateFileDirectory string
+
+	// assignableCPUs is the set of online CPUs as reported by the system
+	assignableCPUs cpuset.CPUSet
 }
 
 var _ Manager = &manager{}
@@ -146,6 +152,7 @@ func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo
 			return nil, err
 		}
 		klog.Infof("[cpumanager] detected CPU topology: %v", topo)
+
 		reservedCPUs, ok := nodeAllocatableReservation[v1.ResourceCPU]
 		if !ok {
 			// The static policy cannot initialize without this information.
@@ -205,6 +212,8 @@ func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesRe
 		klog.Errorf("[cpumanager] policy start error: %v", err)
 		return err
 	}
+
+	m.assignableCPUs = m.policy.GetAssignableCPUs(m.state)
 
 	if m.policy.Name() == string(PolicyNone) {
 		return nil
@@ -302,6 +311,15 @@ func (m *manager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[str
 	m.removeStaleState()
 	// Delegate to active policy
 	return m.policy.GetTopologyHints(m.state, pod, container)
+}
+
+func (m *manager) GetAllCPUs() []int64 {
+	cpus := m.assignableCPUs.ToSlice()
+	cpuIDs := make([]int64, len(cpus))
+	for idx, cpuID := range cpus {
+		cpuIDs[idx] = int64(cpuID)
+	}
+	return cpuIDs
 }
 
 type reconciledContainer struct {
