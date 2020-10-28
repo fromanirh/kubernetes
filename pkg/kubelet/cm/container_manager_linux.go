@@ -1084,3 +1084,11 @@ func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {
 func (cm *containerManagerImpl) UpdateAllocatedDevices() {
 	cm.deviceManager.UpdateAllocatedDevices()
 }
+
+func (cm *containerManagerImpl) GetAllocatableDevices() devicemanager.ResourceDeviceInstances {
+	return cm.deviceManager.GetAllocatableDevices()
+}
+
+func (cm *containerManagerImpl) GetAllocatableCPUs() cpuset.CPUSet {
+	return cm.cpuManager.GetAllocatableCPUs()
+}

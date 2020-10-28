@@ -29,6 +29,7 @@ import (
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
@@ -109,6 +110,9 @@ type ContainerManager interface {
 	// GetCPUs returns information about the cpus assigned to pods and containers
 	GetCPUs(podUID, containerName string) cpuset.CPUSet
 
+	// GetAllocatableCPUs returns the allocatable (not allocated) CPUs
+	GetAllocatableCPUs() cpuset.CPUSet
+
 	// ShouldResetExtendedResourceCapacity returns whether or not the extended resources should be zeroed,
 	// due to node recreation.
 	ShouldResetExtendedResourceCapacity() bool
@@ -118,6 +122,9 @@ type ContainerManager interface {
 
 	// UpdateAllocatedDevices frees any Devices that are bound to terminated pods.
 	UpdateAllocatedDevices()
+
+	// GetAllocatableDevices returns information about all the devices known to the manager
+	GetAllocatableDevices() devicemanager.ResourceDeviceInstances
 }
 
 type NodeConfig struct {

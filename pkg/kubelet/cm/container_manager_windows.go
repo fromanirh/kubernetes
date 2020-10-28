@@ -32,10 +32,12 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	internalapi "k8s.io/cri-api/pkg/apis"
+	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -233,5 +235,13 @@ func (cm *containerManagerImpl) UpdateAllocatedDevices() {
 }
 
 func (cm *containerManagerImpl) GetCPUs(_, _ string) []int64 {
+	return nil
+}
+
+func (cm *containerManagerImpl) GetAllocatableDevices() devicemanager.ResourceDeviceInstances {
+	return nil
+}
+
+func (cm *containerManagerImpl) GetAllocatableCPUs() cpuset.CPUSet {
 	return nil
 }
