@@ -194,6 +194,33 @@ func TestAllocatableResources(t *testing.T) {
 				Topology: nil,
 			},
 		},
+		"resource-mm": {
+			"devM0": {
+				ID:     "M0-77cebe47-3e53-45e1-84ef-7fd4350524e3",
+				Health: "Healthy",
+				Topology: &pluginapi.TopologyInfo{
+					Nodes: []*pluginapi.NUMANode{
+						{
+							ID: 0,
+						},
+					},
+				},
+			},
+			"devMM": {
+				ID:     "MM-45950212-e5e5-4c9d-81e9-a925944853de",
+				Health: "Healthy",
+				Topology: &pluginapi.TopologyInfo{
+					Nodes: []*pluginapi.NUMANode{
+						{
+							ID: 0,
+						},
+						{
+							ID: 1,
+						},
+					},
+				},
+			},
+		},
 	}
 	allCPUs := cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)
 
@@ -250,6 +277,31 @@ func TestAllocatableResources(t *testing.T) {
 						ResourceName: "resource-nt",
 						DeviceIds:    []string{"devA"},
 					},
+					{
+						ResourceName: "resource-mm",
+						DeviceIds:    []string{"devM0"},
+						Topology: &podresourcesapi.TopologyInfo{
+							Nodes: []*podresourcesapi.NUMANode{
+								{
+									ID: 0,
+								},
+							},
+						},
+					},
+					{
+						ResourceName: "resource-mm",
+						DeviceIds:    []string{"devMM"},
+						Topology: &podresourcesapi.TopologyInfo{
+							Nodes: []*podresourcesapi.NUMANode{
+								{
+									ID: 0,
+								},
+								{
+									ID: 1,
+								},
+							},
+						},
+					},
 				},
 			},
 		},
@@ -284,6 +336,31 @@ func TestAllocatableResources(t *testing.T) {
 					{
 						ResourceName: "resource-nt",
 						DeviceIds:    []string{"devA"},
+					},
+					{
+						ResourceName: "resource-mm",
+						DeviceIds:    []string{"devM0"},
+						Topology: &podresourcesapi.TopologyInfo{
+							Nodes: []*podresourcesapi.NUMANode{
+								{
+									ID: 0,
+								},
+							},
+						},
+					},
+					{
+						ResourceName: "resource-mm",
+						DeviceIds:    []string{"devMM"},
+						Topology: &podresourcesapi.TopologyInfo{
+							Nodes: []*podresourcesapi.NUMANode{
+								{
+									ID: 0,
+								},
+								{
+									ID: 1,
+								},
+							},
+						},
 					},
 				},
 			},
