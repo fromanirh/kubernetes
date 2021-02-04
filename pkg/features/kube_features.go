@@ -687,6 +687,12 @@ const (
 	//
 	// Enable support multiple Service "type: LoadBalancer" implementations in a cluster by specifying LoadBalancerClass
 	ServiceLoadBalancerClass featuregate.Feature = "ServiceLoadBalancerClass"
+
+	// owner: @fromanirh
+	// alpha: v1.21
+	//
+	// Enable POD resources API to return allocatable resources
+	KubeletPodResourcesGetAllocatable featuregate.Feature = "KubeletPodResourcesGetAllocatable"
 )
 
 func init() {
@@ -791,6 +797,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	PodDeletionCost:                                {Default: false, PreRelease: featuregate.Alpha},
 	PodAffinityNamespaceSelector:                   {Default: false, PreRelease: featuregate.Alpha},
 	ServiceLoadBalancerClass:                       {Default: false, PreRelease: featuregate.Alpha},
+	KubeletPodResourcesGetAllocatable:              {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
