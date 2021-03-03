@@ -582,7 +582,8 @@ func runTMScopeResourceAlignmentTestSuite(f *framework.Framework, configMap *v1.
 		threadsPerCore = 2
 	}
 	sd := setupSRIOVConfigOrFail(f, configMap)
-	var ctnAttrs, initCtnAttrs []tmCtnAttribute
+
+	waitForSRIOVResources(f, sd)
 
 	envInfo := &testEnvInfo{
 		numaNodes:         numaNodes,
@@ -592,6 +593,8 @@ func runTMScopeResourceAlignmentTestSuite(f *framework.Framework, configMap *v1.
 	}
 
 	ginkgo.By(fmt.Sprintf("Admit two guaranteed pods. Both consist of 2 containers, each container with 1 CPU core. Use 1 %s device.", sd.resourceName))
+
+	var ctnAttrs, initCtnAttrs []tmCtnAttribute
 	ctnAttrs = []tmCtnAttribute{
 		{
 			ctnName:       "ps-container-0",
