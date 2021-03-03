@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -53,6 +54,8 @@ const (
 	numaAlignmentSleepCommand = numaAlignmentCommand + `sleep 1d;`
 	podScopeTopology          = "pod"
 	containerScopeTopology    = "container"
+
+	strictCheckEnvVar = "E2E_TEST_TOPOLOGY_MANAGER_STRICT"
 
 	minNumaNodes     = 2
 	minCoreCount     = 4
@@ -886,21 +889,7 @@ func runTopologyManagerTests(f *framework.Framework) {
 	})
 
 	ginkgo.It("run Topology Manager node alignment test suite", func() {
-		// this is a very rough check. We just want to rule out system that does NOT have
-		// any SRIOV device. A more proper check will be done in runTopologyManagerPositiveTest
-		sriovdevCount := detectSRIOVDevices()
-		numaNodes := detectNUMANodes()
-		coreCount := detectCoresPerSocket()
-
-		if numaNodes < minNumaNodes {
-			e2eskipper.Skipf("this test is meant to run on a multi-node NUMA system")
-		}
-		if coreCount < minCoreCount {
-			e2eskipper.Skipf("this test is meant to run on a system with at least 4 cores per socket")
-		}
-		if sriovdevCount == 0 {
-			e2eskipper.Skipf("this test is meant to run on a system with at least one configured VF from SRIOV device")
-		}
+		numaNodes, coreCount := hostPrecheck()
 
 		configMap := getSRIOVDevicePluginConfigMap(framework.TestContext.SriovdpConfigMapFile)
 
@@ -923,19 +912,7 @@ func runTopologyManagerTests(f *framework.Framework) {
 	})
 
 	ginkgo.It("run the Topology Manager pod scope alignment test suite", func() {
-		sriovdevCount := detectSRIOVDevices()
-		numaNodes := detectNUMANodes()
-		coreCount := detectCoresPerSocket()
-
-		if numaNodes < minNumaNodes {
-			e2eskipper.Skipf("this test is intended to be run on a multi-node NUMA system")
-		}
-		if coreCount < minCoreCount {
-			e2eskipper.Skipf("this test is intended to be run on a system with at least %d cores per socket", minCoreCount)
-		}
-		if sriovdevCount == 0 {
-			e2eskipper.Skipf("this test is intended to be run on a system with at least one SR-IOV VF enabled")
-		}
+		numaNodes, coreCount := hostPrecheck()
 
 		configMap := getSRIOVDevicePluginConfigMap(framework.TestContext.SriovdpConfigMapFile)
 
@@ -954,6 +931,45 @@ func runTopologyManagerTests(f *framework.Framework) {
 		// restore kubelet config
 		setOldKubeletConfig(f, oldCfg)
 	})
+}
+
+func hostPrecheck() (int, int) {
+	// this is a very rough check. We just want to rule out system that does NOT have
+	// any SRIOV device. A more proper check will be done in runTopologyManagerPositiveTest
+
+	_, strictCheck := os.LookupEnv(strictCheckEnvVar)
+
+	numaNodes := detectNUMANodes()
+	if numaNodes < minNumaNodes {
+		msg := "this test is intended to be run on a multi-node NUMA system"
+		if strictCheck {
+			framework.Failf(msg)
+		} else {
+			e2eskipper.Skipf(msg)
+		}
+	}
+
+	coreCount := detectCoresPerSocket()
+	if coreCount < minCoreCount {
+		msg := fmt.Sprintf("this test is intended to be run on a system with at least %d cores per socket", minCoreCount)
+		if strictCheck {
+			framework.Failf(msg)
+		} else {
+			e2eskipper.Skipf(msg)
+		}
+	}
+
+	sriovdevCount := detectSRIOVDevices()
+	if sriovdevCount == 0 {
+		msg := "this test is intended to be run on a system with at least one SR-IOV VF enabled"
+		if strictCheck {
+			framework.Failf(msg)
+		} else {
+			e2eskipper.Skipf(msg)
+		}
+	}
+
+	return numaNodes, coreCount
 }
 
 // Serial because the test updates kubelet configuration.
