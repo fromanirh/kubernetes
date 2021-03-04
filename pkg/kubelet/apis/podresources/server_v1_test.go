@@ -187,6 +187,13 @@ func TestAllocatableResources(t *testing.T) {
 				},
 			},
 		},
+		"resource-nt": {
+			"devA": {
+				ID:       "NT-ab8b2e98-b98b-4464-9fc2-bd2d326bcdaa",
+				Health:   "Healthy",
+				Topology: nil,
+			},
+		},
 	}
 	allCPUs := cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)
 
@@ -239,6 +246,10 @@ func TestAllocatableResources(t *testing.T) {
 							},
 						},
 					},
+					{
+						ResourceName: "resource-nt",
+						DeviceIds:    []string{"devA"},
+					},
 				},
 			},
 		},
@@ -269,6 +280,10 @@ func TestAllocatableResources(t *testing.T) {
 								},
 							},
 						},
+					},
+					{
+						ResourceName: "resource-nt",
+						DeviceIds:    []string{"devA"},
 					},
 				},
 			},
