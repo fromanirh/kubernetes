@@ -750,6 +750,12 @@ type resourceAllocator struct {
 func (m *resourceAllocator) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	pod := attrs.Pod
 
+	if m.cpuManager != nil {
+		if res := m.cpuManager.Admit(attrs); !res.Admit {
+			return res
+		}
+	}
+
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		err := m.deviceManager.Allocate(pod, &container)
 		if err != nil {
@@ -1099,8 +1105,10 @@ type chainedAdmitHandler struct {
 }
 
 func (c *chainedAdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
-	if res := c.cpuManager.Admit(attrs); !res.Admit {
-		return res
+	if c.cpuManager != nil {
+		if res := c.cpuManager.Admit(attrs); !res.Admit {
+			return res
+		}
 	}
 	return c.topologyManager.Admit(attrs)
 }
