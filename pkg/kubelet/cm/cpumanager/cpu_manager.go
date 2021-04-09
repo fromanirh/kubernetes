@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 )
 
@@ -88,6 +89,9 @@ type Manager interface {
 
 	// GetAllocatableCPUs returns the assignable (not allocated) CPUs
 	GetAllocatableCPUs() cpuset.CPUSet
+
+	// PodAdmitHandler is implemented by Manager
+	lifecycle.PodAdmitHandler
 }
 
 type manager struct {
@@ -476,4 +480,11 @@ func (m *manager) updateContainerCPUSet(containerID string, cpus cpuset.CPUSet) 
 
 func (m *manager) GetCPUs(podUID, containerName string) cpuset.CPUSet {
 	return m.state.GetCPUSetOrDefault(podUID, containerName)
+}
+
+func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+	klog.InfoS("CPUManager Admit Handler")
+	pod := attrs.Pod
+
+	return m.policy.Admit(pod)
 }
