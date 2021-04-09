@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
 // PolicyStatic is the name of the static policy
@@ -503,4 +504,8 @@ func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, reu
 	}
 
 	return hints
+}
+
+func (p *staticPolicy) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
+	return admitPod()
 }
