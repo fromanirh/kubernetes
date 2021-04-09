@@ -85,10 +85,7 @@ type staticPolicy struct {
 // Ensure staticPolicy implements Policy interface
 var _ Policy = &staticPolicy{}
 
-// NewStaticPolicy returns a CPU manager policy that does not change CPU
-// assignments for exclusively pinned guaranteed containers after the main
-// container process starts.
-func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reservedCPUs cpuset.CPUSet, affinity topologymanager.Store) (Policy, error) {
+func newStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reservedCPUs cpuset.CPUSet, affinity topologymanager.Store) (*staticPolicy, error) {
 	allCPUs := topology.CPUDetails.CPUs()
 	var reserved cpuset.CPUSet
 	if reservedCPUs.Size() > 0 {
@@ -115,6 +112,13 @@ func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reserv
 		affinity:    affinity,
 		cpusToReuse: make(map[string]cpuset.CPUSet),
 	}, nil
+}
+
+// NewStaticPolicy returns a CPU manager policy that does not change CPU
+// assignments for exclusively pinned guaranteed containers after the main
+// container process starts.
+func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reservedCPUs cpuset.CPUSet, affinity topologymanager.Store) (Policy, error) {
+	return newStaticPolicy(topology, numReservedCPUs, reservedCPUs, affinity)
 }
 
 func (p *staticPolicy) Name() string {
