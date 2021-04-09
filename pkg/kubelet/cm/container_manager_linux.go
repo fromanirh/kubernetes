@@ -730,7 +730,7 @@ func (cm *containerManagerImpl) UpdatePluginResources(node *schedulerframework.N
 
 func (cm *containerManagerImpl) GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler {
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TopologyManager) {
-		return cm.topologyManager
+		return &chainedAdmitHandler{cm.cpuManager, cm.topologyManager}
 	}
 	// TODO: we need to think about a better way to do this. This will work for
 	// now so long as we have only the cpuManager and deviceManager relying on
@@ -749,6 +749,12 @@ type resourceAllocator struct {
 
 func (m *resourceAllocator) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	pod := attrs.Pod
+
+	if m.cpuManager != nil {
+		if res := m.cpuManager.Admit(attrs); !res.Admit {
+			return res
+		}
+	}
 
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		err := m.deviceManager.Allocate(pod, &container)
@@ -1091,4 +1097,18 @@ func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {
 
 func (cm *containerManagerImpl) UpdateAllocatedDevices() {
 	cm.deviceManager.UpdateAllocatedDevices()
+}
+
+type chainedAdmitHandler struct {
+	cpuManager      cpumanager.Manager
+	topologyManager topologymanager.Manager
+}
+
+func (c *chainedAdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+	if c.cpuManager != nil {
+		if res := c.cpuManager.Admit(attrs); !res.Admit {
+			return res
+		}
+	}
+	return c.topologyManager.Admit(attrs)
 }

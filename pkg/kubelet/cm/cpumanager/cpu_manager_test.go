@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
 type mockState struct {
@@ -122,6 +123,10 @@ func (p *mockPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[string]
 
 func (p *mockPolicy) GetAllocatableCPUs(m state.State) cpuset.CPUSet {
 	return cpuset.NewCPUSet()
+}
+
+func (p *mockPolicy) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
+	return lifecycle.PodAdmitResult{Admit: true}
 }
 
 type mockRuntimeService struct {

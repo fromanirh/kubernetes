@@ -21,6 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
 // Policy implements logic for pod container to CPU assignment.
@@ -41,4 +42,18 @@ type Policy interface {
 	GetPodTopologyHints(s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint
 	// GetAllocatableCPUs returns the assignable (not allocated) CPUs
 	GetAllocatableCPUs(m state.State) cpuset.CPUSet
+
+	Admit(pod *v1.Pod) lifecycle.PodAdmitResult
+}
+
+func coresAllocationError() lifecycle.PodAdmitResult {
+	return lifecycle.PodAdmitResult{
+		Message: "WRITEME",
+		Reason:  "CoresAllocationError",
+		Admit:   false,
+	}
+}
+
+func admitPod() lifecycle.PodAdmitResult {
+	return lifecycle.PodAdmitResult{Admit: true}
 }
