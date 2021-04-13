@@ -59,7 +59,7 @@ func (p *smtAwarePolicy) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.Po
 			// we intentionally don't check we have enough free cores. We just check we have enough free cpus.
 			// This works because the allocation later on will be performed in terms of full cores (or multiples of).
 			// TODO: expand.
-			return coresAllocationError()
+			return coresAllocationError(requested, cpusPerCore)
 		}
 	}
 	return admitPod()

@@ -533,9 +533,10 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 	return m.admitHandler.Admit(attrs)
 }
 
-func coresAllocationError() lifecycle.PodAdmitResult {
+func coresAllocationError(requestedCPUs, cpusPerCore int) lifecycle.PodAdmitResult {
+	message := fmt.Sprintf("Number of CPUs requested should be a multiple of number of CPUs on a core = %d on this system. Requested CPU count = %d", requestedCPUs, cpusPerCore)
 	return lifecycle.PodAdmitResult{
-		Message: "WRITEME",
+		Message: message,
 		Reason:  "CoresAllocationError",
 		Admit:   false,
 	}
