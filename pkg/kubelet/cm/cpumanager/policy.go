@@ -43,7 +43,7 @@ type Policy interface {
 	// GetAllocatableCPUs returns the assignable (not allocated) CPUs
 	GetAllocatableCPUs(m state.State) cpuset.CPUSet
 
-	Admit(pod *v1.Pod) lifecycle.PodAdmitResult
+	Admit(allocatableCPUs cpuset.CPUSet, pod *v1.Pod) lifecycle.PodAdmitResult
 }
 
 func coresAllocationError() lifecycle.PodAdmitResult {

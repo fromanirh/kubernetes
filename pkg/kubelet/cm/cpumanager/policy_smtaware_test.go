@@ -61,8 +61,9 @@ func TestSMTAwarePolicyAdmit(t *testing.T) {
 		},
 	}
 
+	cset := cpuset.NewCPUSet() // TODO
 	for _, testCase := range testCases {
-		res := testPolicy.Admit(testCase.pod)
+		res := testPolicy.Admit(cset, testCase.pod)
 		if res.Admit != testCase.admit {
 			t.Errorf("policy error pod=%#v admit expected=%v got=%v",
 				testCase.pod, testCase.admit, res.Admit)

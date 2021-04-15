@@ -20,12 +20,9 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
-	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
@@ -55,7 +52,7 @@ func (p *smtAwarePolicy) Name() string {
 	return string(PolicySMTAware)
 }
 
-func (p *smtAwarePolicy) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
+func (p *smtAwarePolicy) Admit(allocatableCPUs cpuset.CPUSet, pod *v1.Pod) lifecycle.PodAdmitResult {
 	cpusPerCore := p.topology.CPUsPerCore()
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		if requested := p.guaranteedCPUs(pod, &container); requested > 0 && (requested%cpusPerCore) != 0 {
@@ -65,5 +62,5 @@ func (p *smtAwarePolicy) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
 			return coresAllocationError()
 		}
 	}
-	return p.staticPolicy.Admit(pod)
+	return p.staticPolicy.Admit(allocatableCPUs, pod)
 }

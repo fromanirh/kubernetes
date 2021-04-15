@@ -125,7 +125,7 @@ func (p *mockPolicy) GetAllocatableCPUs(m state.State) cpuset.CPUSet {
 	return cpuset.NewCPUSet()
 }
 
-func (p *mockPolicy) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
+func (p *mockPolicy) Admit(_ cpuset.CPUSet, pod *v1.Pod) lifecycle.PodAdmitResult {
 	return lifecycle.PodAdmitResult{Admit: true}
 }
 

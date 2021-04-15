@@ -71,6 +71,6 @@ func (p *nonePolicy) GetAllocatableCPUs(m state.State) cpuset.CPUSet {
 	return cpuset.NewCPUSet()
 }
 
-func (p *nonePolicy) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
+func (p *nonePolicy) Admit(allocatableCPUs cpuset.CPUSet, pod *v1.Pod) lifecycle.PodAdmitResult {
 	return admitPod()
 }

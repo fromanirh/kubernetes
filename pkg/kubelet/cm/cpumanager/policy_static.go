@@ -506,6 +506,6 @@ func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, reu
 	return hints
 }
 
-func (p *staticPolicy) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
+func (p *staticPolicy) Admit(_ cpuset.CPUSet, pod *v1.Pod) lifecycle.PodAdmitResult {
 	return admitPod()
 }
