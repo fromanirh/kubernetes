@@ -151,6 +151,9 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.CPUManagerPolicy == "" {
 		obj.CPUManagerPolicy = "none"
 	}
+	if obj.CPUManagerPolicyOptions == nil {
+		obj.CPUManagerPolicyOptions = []string{}
+	}
 	if obj.CPUManagerReconcilePeriod == zeroDuration {
 		// Keep the same as default NodeStatusUpdateFrequency
 		obj.CPUManagerReconcilePeriod = metav1.Duration{Duration: 10 * time.Second}
