@@ -125,6 +125,9 @@ func (s *scope) admitPolicyNone(pod *v1.Pod) lifecycle.PodAdmitResult {
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		err := s.allocateAlignedResources(pod, &container)
 		if err != nil {
+			if _, ok := err.(*SMTAlignmentError); ok {
+				return smtAlignmentError(err)
+			}
 			return unexpectedAdmissionError(err)
 		}
 	}

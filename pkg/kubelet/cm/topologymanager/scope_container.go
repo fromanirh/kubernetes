@@ -17,7 +17,7 @@ limitations under the License.
 package topologymanager
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
@@ -59,6 +59,9 @@ func (s *containerScope) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
 
 		err := s.allocateAlignedResources(pod, &container)
 		if err != nil {
+			if _, ok := err.(*SMTAlignmentError); ok {
+				return smtAlignmentError(err)
+			}
 			return unexpectedAdmissionError(err)
 		}
 	}
