@@ -172,10 +172,10 @@ func smtAlignmentError(err error) lifecycle.PodAdmitResult {
 }
 
 type SMTAlignmentError struct {
-	requestedCPUs int
-	cpusPerCore   int
+	RequestedCPUs int
+	CpusPerCore   int
 }
 
 func (e SMTAlignmentError) Error() string {
-	return fmt.Sprintf("Number of CPUs requested should be a multiple of number of CPUs on a core = %d on this system. Requested CPU count = %d", e.cpusPerCore, e.requestedCPUs)
+	return fmt.Sprintf("Number of CPUs requested should be a multiple of number of CPUs on a core = %d on this system. Requested CPU count = %d", e.CpusPerCore, e.RequestedCPUs)
 }
