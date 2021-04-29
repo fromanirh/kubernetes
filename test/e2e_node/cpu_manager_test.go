@@ -17,8 +17,10 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -34,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
@@ -159,6 +162,16 @@ func isMultiNUMA() bool {
 	return numaNodes > 1
 }
 
+func getSMTLevel() int {
+	out, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("cat /sys/devices/system/cpu/cpu%d/topology/thread_siblings_list | tr -d \"\n\r\"", 0)).Output()
+	framework.ExpectNoError(err)
+	// how many thread sibling you have = SMT level
+	// example: 2-way SMT means 2 threads sibling for each thread
+	cpus, err := cpuset.Parse(strings.TrimSpace(string(out)))
+	framework.ExpectNoError(err)
+	return cpus.Size()
+}
+
 func getCPUSiblingList(cpuRes int64) string {
 	out, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("cat /sys/devices/system/cpu/cpu%d/topology/thread_siblings_list | tr -d \"\n\r\"", cpuRes)).Output()
 	framework.ExpectNoError(err)
@@ -210,10 +223,10 @@ func disableCPUManagerInKubelet(f *framework.Framework) (oldCfg *kubeletconfig.K
 }
 
 func enableCPUManagerInKubelet(f *framework.Framework, cleanStateFile bool) (oldCfg *kubeletconfig.KubeletConfiguration) {
-	return configureCPUManagerInKubelet(f, cleanStateFile, cpuset.CPUSet{})
+	return configureCPUManagerInKubelet(f, cleanStateFile, cpuset.CPUSet{}, []string{})
 }
 
-func configureCPUManagerInKubelet(f *framework.Framework, cleanStateFile bool, reservedSystemCPUs cpuset.CPUSet) (oldCfg *kubeletconfig.KubeletConfiguration) {
+func configureCPUManagerInKubelet(f *framework.Framework, cleanStateFile bool, reservedSystemCPUs cpuset.CPUSet, options []string) (oldCfg *kubeletconfig.KubeletConfiguration) {
 	// Enable CPU Manager in Kubelet with static policy.
 	oldCfg, err := getCurrentKubeletConfig()
 	framework.ExpectNoError(err)
@@ -239,9 +252,9 @@ func configureCPUManagerInKubelet(f *framework.Framework, cleanStateFile bool, r
 
 	// Set the CPU Manager policy to static.
 	newCfg.CPUManagerPolicy = string(cpumanager.PolicyStatic)
-
 	// Set the CPU Manager reconcile period to 1 second.
 	newCfg.CPUManagerReconcilePeriod = metav1.Duration{Duration: 1 * time.Second}
+	newCfg.CPUManagerPolicyOptions = options
 
 	if reservedSystemCPUs.Size() > 0 {
 		cpus := reservedSystemCPUs.String()
@@ -660,9 +673,137 @@ func runCPUManagerTests(f *framework.Framework) {
 		ginkgo.By("the deleted pod has already been deleted from the state file")
 	})
 
+	ginkgo.It("should assign CPUs as expected based on the smtaware option", func() {
+		_, cpuAlloc, _ = getLocalNodeCPUDetails(f)
+		smtLevel := getSMTLevel()
+
+		// smtaware behaviour is trivially verified and granted on non-SMT systems
+		if smtLevel < 2 {
+			e2eskipper.Skipf("Skipping CPU Manager option=smtaware tests since SMT disabled")
+		}
+
+		// our tests want to allocate a full core, so we need at last 2*2=4 virtual cpus
+		if cpuAlloc < int64(smtLevel*2) {
+			e2eskipper.Skipf("Skipping CPU Manager option=smtaware tests since the CPU capacity < 4")
+		}
+
+		framework.Logf("SMT level %d", smtLevel)
+
+		cleanStateFile := true
+		// TODO: we assume the first available CPUID is 0, which is pretty fair, but we should probably
+		// check what we do have in the node.
+		oldCfg = configureCPUManagerInKubelet(f, cleanStateFile, cpuset.NewCPUSet(0), []string{"smtaware"})
+
+		// the order between negative and positive doesn't really matter
+		runSMTAwareNegativeTests(f)
+		runSMTAwarePositiveTests(f, smtLevel)
+	})
+
 	ginkgo.AfterEach(func() {
 		setOldKubeletConfig(f, oldCfg)
 	})
+}
+
+func runSMTAwareNegativeTests(f *framework.Framework) {
+	// negative test: try to run a container whose requests aren't a multiple of SMT level, expect a rejection
+	ctnAttrs := []ctnAttribute{
+		{
+			ctnName:    "gu-container-neg",
+			cpuRequest: "1000m",
+			cpuLimit:   "1000m",
+		},
+	}
+	pod := makeCPUManagerPod("gu-pod", ctnAttrs)
+	// CreateSync would wait for pod to become Ready - which will never happen if production code works as intended!
+	pod = f.PodClient().Create(pod)
+
+	err := e2epod.WaitForPodCondition(f.ClientSet, f.Namespace.Name, pod.Name, "Failed", 30*time.Second, func(pod *v1.Pod) (bool, error) {
+		if pod.Status.Phase != v1.PodPending {
+			return true, nil
+		}
+		return false, nil
+	})
+	framework.ExpectNoError(err)
+	pod, err = f.PodClient().Get(context.TODO(), pod.Name, metav1.GetOptions{})
+	framework.ExpectNoError(err)
+
+	if pod.Status.Phase != v1.PodFailed {
+		framework.Failf("pod %s not failed: %v", pod.Name, pod.Status)
+	}
+	if !isSMTAlignmentError(pod) {
+		framework.Failf("pod %s failed for wrong reason: %q", pod.Name, pod.Status.Reason)
+	}
+
+	deletePodSyncByName(f, pod.Name)
+	// we need to wait for all containers to really be gone so cpumanager reconcile loop will not rewrite the cpu_manager_state.
+	// this is in turn needed because we will have an unavoidable (in the current framework) race with th
+	// reconcile loop which will make our attempt to delete the state file and to restore the old config go haywire
+	waitForAllContainerRemoval(pod.Name, pod.Namespace)
+}
+
+func runSMTAwarePositiveTests(f *framework.Framework, smtLevel int) {
+	// positive test: try to run a container whose requests are a multiple of SMT level, check allocated cores
+	// 1. are core siblings
+	// 2. take a full core
+	// WARNING: this assumes 2-way SMT systems - we don't know how to access other SMT levels.
+	//          this means on more-than-2-way SMT systems this test will prove nothing
+	ctnAttrs := []ctnAttribute{
+		{
+			ctnName:    "gu-container-pos",
+			cpuRequest: "2000m",
+			cpuLimit:   "2000m",
+		},
+	}
+	pod := makeCPUManagerPod("gu-pod", ctnAttrs)
+	pod = f.PodClient().CreateSync(pod)
+
+	for _, cnt := range pod.Spec.Containers {
+		ginkgo.By(fmt.Sprintf("validating the container %s on Gu pod %s", cnt.Name, pod.Name))
+
+		logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, cnt.Name)
+		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cnt.Name, pod.Name)
+
+		framework.Logf("got pod logs: %v", logs)
+		cpus, err := cpuset.Parse(strings.TrimSpace(logs))
+		framework.ExpectNoError(err, "parsing cpuset from logs for [%s] of pod [%s]", cnt.Name, pod.Name)
+
+		validateSMTAlignment(cpus, smtLevel, pod, &cnt)
+	}
+
+	deletePodSyncByName(f, pod.Name)
+	// we need to wait for all containers to really be gone so cpumanager reconcile loop will not rewrite the cpu_manager_state.
+	// this is in turn needed because we will have an unavoidable (in the current framework) race with th
+	// reconcile loop which will make our attempt to delete the state file and to restore the old config go haywire
+	waitForAllContainerRemoval(pod.Name, pod.Namespace)
+}
+
+func validateSMTAlignment(cpus cpuset.CPUSet, smtLevel int, pod *v1.Pod, cnt *v1.Container) {
+	framework.Logf("validating cpus: %v", cpus)
+
+	if cpus.Size()%smtLevel != 0 {
+		framework.Failf("pod %q cnt %q received non-smt-multiple cpuset %v (SMT level %d)", pod.Name, cnt.Name, cpus, smtLevel)
+	}
+
+	// now check all the given cpus are thread siblings.
+	// to do so the easiest way is to rebuild the expected set of siblings from all the cpus we got.
+	// if the expected set matches the given set, the given set was good.
+	b := cpuset.NewBuilder()
+	for _, cpuID := range cpus.ToSliceNoSort() {
+		threadSiblings, err := cpuset.Parse(strings.TrimSpace(getCPUSiblingList(int64(cpuID))))
+		framework.ExpectNoError(err, "parsing cpuset from logs for [%s] of pod [%s]", cnt.Name, pod.Name)
+		b.Add(threadSiblings.ToSliceNoSort()...)
+	}
+	siblingsCPUs := b.Result()
+
+	framework.Logf("siblings cpus: %v", siblingsCPUs)
+	if !siblingsCPUs.Equals(cpus) {
+		framework.Failf("pod %q cnt %q received non-smt-aligned cpuset %v (expected %v)", pod.Name, cnt.Name, cpus, siblingsCPUs)
+	}
+}
+
+func isSMTAlignmentError(pod *v1.Pod) bool {
+	re := regexp.MustCompile(`SMT.*Alignment.*Error`)
+	return re.MatchString(pod.Status.Reason)
 }
 
 // Serial because the test updates kubelet configuration.
