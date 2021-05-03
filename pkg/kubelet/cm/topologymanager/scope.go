@@ -17,13 +17,10 @@ limitations under the License.
 package topologymanager
 
 import (
-	"fmt"
-
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
 const (
@@ -38,7 +35,7 @@ type podTopologyHints map[string]map[string]TopologyHint
 // Scope interface for Topology Manager
 type Scope interface {
 	Name() string
-	Admit(pod *v1.Pod) lifecycle.PodAdmitResult
+	Admit(pod *v1.Pod) error
 	// AddHintProvider adds a hint provider to manager to indicate the hint provider
 	// wants to be consoluted with when making topology hints
 	AddHintProvider(h HintProvider)
@@ -121,17 +118,14 @@ func (s *scope) RemoveContainer(containerID string) error {
 	return nil
 }
 
-func (s *scope) admitPolicyNone(pod *v1.Pod) lifecycle.PodAdmitResult {
+func (s *scope) admitPolicyNone(pod *v1.Pod) error {
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		err := s.allocateAlignedResources(pod, &container)
 		if err != nil {
-			if _, ok := err.(*SMTAlignmentError); ok {
-				return smtAlignmentError(err)
-			}
-			return unexpectedAdmissionError(err)
+			return err
 		}
 	}
-	return admitPod()
+	return nil
 }
 
 // It would be better to implement this function in topologymanager instead of scope
@@ -146,39 +140,8 @@ func (s *scope) allocateAlignedResources(pod *v1.Pod, container *v1.Container) e
 	return nil
 }
 
-func topologyAffinityError() lifecycle.PodAdmitResult {
-	return lifecycle.PodAdmitResult{
-		Message: "Resources cannot be allocated with Topology locality",
-		Reason:  "TopologyAffinityError",
-		Admit:   false,
-	}
-}
+type TopologyAffinityError struct{}
 
-func unexpectedAdmissionError(err error) lifecycle.PodAdmitResult {
-	return lifecycle.PodAdmitResult{
-		Message: fmt.Sprintf("Allocate failed due to %v, which is unexpected", err),
-		Reason:  "UnexpectedAdmissionError",
-		Admit:   false,
-	}
-}
-
-func admitPod() lifecycle.PodAdmitResult {
-	return lifecycle.PodAdmitResult{Admit: true}
-}
-
-func smtAlignmentError(err error) lifecycle.PodAdmitResult {
-	return lifecycle.PodAdmitResult{
-		Message: err.Error(),
-		Reason:  "SMTAlignmentError",
-		Admit:   false,
-	}
-}
-
-type SMTAlignmentError struct {
-	RequestedCPUs int
-	CpusPerCore   int
-}
-
-func (e SMTAlignmentError) Error() string {
-	return fmt.Sprintf("Number of CPUs requested should be a multiple of number of CPUs on a core = %d on this system. Requested CPU count = %d", e.CpusPerCore, e.RequestedCPUs)
+func (e TopologyAffinityError) Error() string {
+	return "Resources cannot be allocated with Topology locality"
 }

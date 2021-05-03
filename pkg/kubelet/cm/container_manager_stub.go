@@ -124,7 +124,7 @@ func (cm *containerManagerStub) ShouldResetExtendedResourceCapacity() bool {
 }
 
 func (cm *containerManagerStub) GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler {
-	return topologymanager.NewFakeManager()
+	return &tmAdmissionHelper{topologymanager.NewFakeManager()}
 }
 
 func (cm *containerManagerStub) UpdateAllocatedDevices() {

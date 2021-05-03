@@ -51,6 +51,7 @@ import (
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
@@ -730,7 +731,7 @@ func (cm *containerManagerImpl) UpdatePluginResources(node *schedulerframework.N
 
 func (cm *containerManagerImpl) GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler {
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TopologyManager) {
-		return cm.topologyManager
+		return &tmAdmissionHelper{cm.topologyManager}
 	}
 	// TODO: we need to think about a better way to do this. This will work for
 	// now so long as we have only the cpuManager and deviceManager relying on
@@ -739,6 +740,19 @@ func (cm *containerManagerImpl) GetAllocateResourcesPodAdmitHandler() lifecycle.
 	// needs to call Allocate() on (that may not be directly intstantiated
 	// inside this component).
 	return &resourceAllocator{cm.cpuManager, cm.memoryManager, cm.deviceManager}
+}
+
+type tmAdmissionHelper struct {
+	topologyManager topologymanager.Manager
+}
+
+func (h *tmAdmissionHelper) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+	pod := attrs.Pod
+	err := h.topologyManager.Admit(pod)
+	if err != nil {
+		return admission.UnexpectedAdmissionError(err)
+	}
+	return admission.AdmitPod()
 }
 
 type resourceAllocator struct {
@@ -753,39 +767,20 @@ func (m *resourceAllocator) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		err := m.deviceManager.Allocate(pod, &container)
 		if err != nil {
-			return lifecycle.PodAdmitResult{
-				Message: fmt.Sprintf("Allocate failed due to %v, which is unexpected", err),
-				Reason:  "UnexpectedAdmissionError",
-				Admit:   false,
-			}
+			return admission.UnexpectedAdmissionError(err)
 		}
 
 		if m.cpuManager != nil {
 			err = m.cpuManager.Allocate(pod, &container)
 			if err != nil {
-				if _, ok := err.(*topologymanager.SMTAlignmentError); ok {
-					return lifecycle.PodAdmitResult{
-						Message: err.Error(),
-						Reason:  "SMTAlignmentError",
-						Admit:   false,
-					}
-				}
-				return lifecycle.PodAdmitResult{
-					Message: fmt.Sprintf("Allocate failed due to %v, which is unexpected", err),
-					Reason:  "UnexpectedAdmissionError",
-					Admit:   false,
-				}
+				return admission.AdmissionError(err)
 			}
 		}
 
 		if m.memoryManager != nil {
 			err = m.memoryManager.Allocate(pod, &container)
 			if err != nil {
-				return lifecycle.PodAdmitResult{
-					Message: fmt.Sprintf("Allocate failed due to %v, which is unexpected", err),
-					Reason:  "UnexpectedAdmissionError",
-					Admit:   false,
-				}
+				return admission.UnexpectedAdmissionError(err)
 			}
 		}
 	}

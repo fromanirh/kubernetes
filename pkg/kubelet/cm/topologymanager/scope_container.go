@@ -19,7 +19,6 @@ package topologymanager
 import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
 type containerScope struct {
@@ -41,7 +40,7 @@ func NewContainerScope(policy Policy) Scope {
 	}
 }
 
-func (s *containerScope) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
+func (s *containerScope) Admit(pod *v1.Pod) error {
 	// Exception - Policy : none
 	if s.policy.Name() == PolicyNone {
 		return s.admitPolicyNone(pod)
@@ -52,20 +51,17 @@ func (s *containerScope) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
 		klog.InfoS("Best TopologyHint", "bestHint", bestHint, "pod", klog.KObj(pod), "containerName", container.Name)
 
 		if !admit {
-			return topologyAffinityError()
+			return TopologyAffinityError{}
 		}
 		klog.InfoS("Topology Affinity", "bestHint", bestHint, "pod", klog.KObj(pod), "containerName", container.Name)
 		s.setTopologyHints(string(pod.UID), container.Name, bestHint)
 
 		err := s.allocateAlignedResources(pod, &container)
 		if err != nil {
-			if _, ok := err.(*SMTAlignmentError); ok {
-				return smtAlignmentError(err)
-			}
-			return unexpectedAdmissionError(err)
+			return err
 		}
 	}
-	return admitPod()
+	return nil
 }
 
 func (s *containerScope) accumulateProvidersHints(pod *v1.Pod, container *v1.Container) []map[string][]TopologyHint {

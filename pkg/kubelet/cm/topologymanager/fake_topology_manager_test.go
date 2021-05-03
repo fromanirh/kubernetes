@@ -20,9 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
 func TestNewFakeManager(t *testing.T) {
@@ -118,38 +117,36 @@ func TestFakeRemoveContainer(t *testing.T) {
 func TestFakeAdmit(t *testing.T) {
 	tcases := []struct {
 		name     string
-		result   lifecycle.PodAdmitResult
+		result   error
 		qosClass v1.PodQOSClass
 		expected bool
 	}{
 		{
 			name:     "QOSClass set as Guaranteed",
-			result:   lifecycle.PodAdmitResult{},
+			result:   nil,
 			qosClass: v1.PodQOSGuaranteed,
 			expected: true,
 		},
 		{
 			name:     "QOSClass set as Burstable",
-			result:   lifecycle.PodAdmitResult{},
+			result:   nil,
 			qosClass: v1.PodQOSBurstable,
 			expected: true,
 		},
 		{
 			name:     "QOSClass set as BestEffort",
-			result:   lifecycle.PodAdmitResult{},
+			result:   nil,
 			qosClass: v1.PodQOSBestEffort,
 			expected: true,
 		},
 	}
 	fm := fakeManager{}
 	for _, tc := range tcases {
-		podAttr := lifecycle.PodAdmitAttributes{}
 		pod := v1.Pod{}
 		pod.Status.QOSClass = tc.qosClass
-		podAttr.Pod = &pod
-		actual := fm.Admit(&podAttr)
-		if reflect.DeepEqual(actual, tc.result) {
-			t.Errorf("Error occurred, expected Admit in result to be %v got %v", tc.result, actual.Admit)
+		actual := fm.Admit(&pod)
+		if actual != tc.result {
+			t.Errorf("Error occurred, expected Admit in result to be %v got %v", tc.result, actual)
 		}
 	}
 }

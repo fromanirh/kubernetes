@@ -17,9 +17,8 @@ limitations under the License.
 package topologymanager
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
 type fakeManager struct{}
@@ -49,9 +48,7 @@ func (m *fakeManager) RemoveContainer(containerID string) error {
 	return nil
 }
 
-func (m *fakeManager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+func (m *fakeManager) Admit(pod *v1.Pod) error {
 	klog.InfoS("Topology Admit Handler")
-	return lifecycle.PodAdmitResult{
-		Admit: true,
-	}
+	return nil
 }

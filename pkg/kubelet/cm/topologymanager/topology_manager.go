@@ -20,10 +20,9 @@ import (
 	"fmt"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
-	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
 const (
@@ -40,8 +39,8 @@ const (
 
 // Manager interface provides methods for Kubelet to manage pod topology hints
 type Manager interface {
-	// PodAdmitHandler is implemented by Manager
-	lifecycle.PodAdmitHandler
+	// Admission control
+	Admit(pod *v1.Pod) error
 	// AddHintProvider adds a hint provider to manager to indicate the hint provider
 	// wants to be consulted with when making topology hints
 	AddHintProvider(HintProvider)
@@ -183,9 +182,7 @@ func (m *manager) RemoveContainer(containerID string) error {
 	return m.scope.RemoveContainer(containerID)
 }
 
-func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+func (m *manager) Admit(pod *v1.Pod) error {
 	klog.InfoS("Topology Admit Handler")
-	pod := attrs.Pod
-
 	return m.scope.Admit(pod)
 }

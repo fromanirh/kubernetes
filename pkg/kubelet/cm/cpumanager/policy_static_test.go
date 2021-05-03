@@ -471,7 +471,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			stAssignments:   state.ContainerCPUAssignments{},
 			stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7),
 			pod:             makePod("fakePod", "fakeContainer2", "1000m", "1000m"),
-			expErr:          topologymanager.SMTAlignmentError{RequestedCPUs: 1, CpusPerCore: 2},
+			expErr:          SMTAlignmentError{RequestedCPUs: 1, CpusPerCore: 2},
 			expCPUAlloc:     false,
 			expCSet:         cpuset.NewCPUSet(), // reject allocation of sibling of partial core
 		},
@@ -484,7 +484,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			stAssignments:   state.ContainerCPUAssignments{},
 			stDefaultCPUSet: largeTopoCPUSet,
 			pod:             makePod("fakePod", "fakeContainer15", "15000m", "15000m"),
-			expErr:          topologymanager.SMTAlignmentError{RequestedCPUs: 15, CpusPerCore: 4},
+			expErr:          SMTAlignmentError{RequestedCPUs: 15, CpusPerCore: 4},
 			expCPUAlloc:     false,
 			expCSet:         cpuset.NewCPUSet(),
 		},
