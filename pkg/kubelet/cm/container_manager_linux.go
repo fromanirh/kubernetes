@@ -328,8 +328,15 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 
 	// Initialize CPU manager
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
+		cpuManagerPolicyOptions := nodeConfig.ExperimentalCPUManagerPolicyOptions
+		if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManagerPolicyOptions) {
+			klog.InfoS("CPU Manager policy options feature gate not enabled, ignoring values", "option", cpuManagerPolicyOptions)
+			cpuManagerPolicyOptions = []string{}
+		}
+
 		cm.cpuManager, err = cpumanager.NewManager(
 			nodeConfig.ExperimentalCPUManagerPolicy,
+			cpuManagerPolicyOptions,
 			nodeConfig.ExperimentalCPUManagerReconcilePeriod,
 			machineInfo,
 			nodeConfig.NodeAllocatableConfig.ReservedSystemCPUs,
