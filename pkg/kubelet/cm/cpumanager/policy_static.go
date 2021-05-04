@@ -79,6 +79,8 @@ type staticPolicy struct {
 	affinity topologymanager.Store
 	// set of CPUs to reuse across allocations in a pod
 	cpusToReuse map[string]cpuset.CPUSet
+	// options allow to fine-tune the behaviour of the policy
+	options StaticPolicyOptions
 }
 
 // Ensure staticPolicy implements Policy interface
@@ -87,7 +89,14 @@ var _ Policy = &staticPolicy{}
 // NewStaticPolicy returns a CPU manager policy that does not change CPU
 // assignments for exclusively pinned guaranteed containers after the main
 // container process starts.
-func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reservedCPUs cpuset.CPUSet, affinity topologymanager.Store) (Policy, error) {
+func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reservedCPUs cpuset.CPUSet, affinity topologymanager.Store, cpuPolicyOptions []string) (Policy, error) {
+	opts, err := NewStaticPolicyOptions(cpuPolicyOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	klog.InfoS("Static policy created with configuration", "options", opts)
+
 	allCPUs := topology.CPUDetails.CPUs()
 	var reserved cpuset.CPUSet
 	if reservedCPUs.Size() > 0 {
@@ -113,6 +122,7 @@ func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reserv
 		reserved:    reserved,
 		affinity:    affinity,
 		cpusToReuse: make(map[string]cpuset.CPUSet),
+		options:     opts,
 	}, nil
 }
 

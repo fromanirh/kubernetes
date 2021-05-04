@@ -175,7 +175,7 @@ func NewManager(cpuPolicyName string, cpuPolicyOptions []string, reconcilePeriod
 		// exclusively allocated.
 		reservedCPUsFloat := float64(reservedCPUs.MilliValue()) / 1000
 		numReservedCPUs := int(math.Ceil(reservedCPUsFloat))
-		policy, err = NewStaticPolicy(topo, numReservedCPUs, specificCPUs, affinity)
+		policy, err = NewStaticPolicy(topo, numReservedCPUs, specificCPUs, affinity, cpuPolicyOptions)
 		if err != nil {
 			return nil, fmt.Errorf("new static policy error: %v", err)
 		}

@@ -229,7 +229,8 @@ func TestCPUManagerAdd(t *testing.T) {
 		},
 		0,
 		cpuset.NewCPUSet(),
-		topologymanager.NewFakeManager())
+		topologymanager.NewFakeManager(),
+		[]string{})
 	testCases := []struct {
 		description        string
 		updateErr          error
@@ -478,7 +479,7 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.NewCPUSet(), topologymanager.NewFakeManager())
+		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.NewCPUSet(), topologymanager.NewFakeManager(), []string{})
 
 		mockState := &mockState{
 			assignments:   testCase.stAssignments,
@@ -1000,7 +1001,8 @@ func TestCPUManagerAddWithResvList(t *testing.T) {
 		},
 		1,
 		cpuset.NewCPUSet(0),
-		topologymanager.NewFakeManager())
+		topologymanager.NewFakeManager(),
+		[]string{})
 	testCases := []struct {
 		description        string
 		updateErr          error
