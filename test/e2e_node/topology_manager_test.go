@@ -372,7 +372,7 @@ func runTopologyManagerPolicySuiteTests(f *framework.Framework) {
 	runNonGuPodTest(f, cpuCap)
 
 	ginkgo.By("running a Gu pod")
-	runGuPodTest(f)
+	runGuPodTest(f, 1)
 
 	ginkgo.By("running multiple Gu and non-Gu pods")
 	runMultipleGuNonGuPods(f, cpuCap, cpuAlloc)
