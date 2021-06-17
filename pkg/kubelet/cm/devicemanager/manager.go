@@ -628,6 +628,7 @@ func (m *ManagerImpl) readCheckpoint() error {
 			// a tiny fraction of time, so what matters most is the current checkpoint read error.
 			return err
 		}
+		klog.InfoS("Restored V1 checkpoint", "checkpoint", kubeletDeviceManagerCheckpoint)
 	}
 
 	m.mutex.Lock()

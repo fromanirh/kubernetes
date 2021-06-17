@@ -76,7 +76,7 @@ func NewV1(devEntries []PodDevicesEntryV1,
 // MarshalCheckpoint is needed to implement the Checkpoint interface, but should not be called anymore
 func (cp *DataV1) MarshalCheckpoint() ([]byte, error) {
 	klog.InfoS("Marshalling a device manager V1 checkpoint")
-	cp.Checksum = checksum.New(cp.Data)
+	cp.Checksum = cp.Data.checksum()
 	return json.Marshal(*cp)
 }
 
