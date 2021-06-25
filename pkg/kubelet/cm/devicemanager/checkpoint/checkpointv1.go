@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 )
 
+// PodDevicesEntry connects pod information to devices, without topology information (k8s <= 1.19)
 type PodDevicesEntryV1 struct {
 	PodUID        string
 	ContainerName string
@@ -36,11 +37,15 @@ type PodDevicesEntryV1 struct {
 	AllocResp     []byte
 }
 
+// checkpointData struct is used to store pod to device allocation information
+// in a checkpoint file, without topology information (k8s <= 1.19)
 type checkpointDataV1 struct {
 	PodDeviceEntries  []PodDevicesEntryV1
 	RegisteredDevices map[string][]string
 }
 
+// checksum compute the checksum using the same algorithms (and data type names) k8s 1.19 used.
+// We need this special code path to be able to correctly validate the checksum k8s 1.19 wrote.
 // credits to https://github.com/kubernetes/kubernetes/pull/102717/commits/353f93895118d2ffa2d59a29a1fbc225160ea1d6
 func (cp checkpointDataV1) checksum() checksum.Checksum {
 	printer := spew.ConfigState{
@@ -58,11 +63,16 @@ func (cp checkpointDataV1) checksum() checksum.Checksum {
 	return checksum.Checksum(hash.Sum32())
 }
 
+// Data holds checkpoint data and its checksum, in V1 (k8s <= 1.19) format
 type DataV1 struct {
 	Data     checkpointDataV1
 	Checksum checksum.Checksum
 }
 
+// New returns an instance of Checkpoint, in V1 (k8s <= 1.19) format.
+// Users should avoid creating checkpoints in formats different than the most recent one,
+// use the old formats only to validate existing checkpoint and convert them to most recent
+// format. The only exception should be test code.
 func NewV1(devEntries []PodDevicesEntryV1,
 	devices map[string][]string) DeviceManagerCheckpoint {
 	return &DataV1{
@@ -80,10 +90,12 @@ func (cp *DataV1) MarshalCheckpoint() ([]byte, error) {
 	return json.Marshal(*cp)
 }
 
+// MarshalCheckpoint returns marshalled data
 func (cp *DataV1) UnmarshalCheckpoint(blob []byte) error {
 	return json.Unmarshal(blob, cp)
 }
 
+// VerifyChecksum verifies that passed checksum is same as calculated checksum
 func (cp *DataV1) VerifyChecksum() error {
 	if cp.Checksum != cp.Data.checksum() {
 		return errors.ErrCorruptCheckpoint
@@ -91,6 +103,8 @@ func (cp *DataV1) VerifyChecksum() error {
 	return nil
 }
 
+// GetData returns device entries and registered devices in the *most recent* checkpoint format,
+// *not* in the original format.
 func (cp *DataV1) GetData() ([]PodDevicesEntry, map[string][]string) {
 	var podDevs []PodDevicesEntry
 	for _, entryV1 := range cp.Data.PodDeviceEntries {
