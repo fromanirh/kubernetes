@@ -152,11 +152,16 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			}, 30*time.Second, framework.Poll).Should(gomega.BeTrue())
 
 			ginkgo.By("Creating one pod on node with at least one fake-device")
-			podRECMD := "devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs"
+			// TODO: the sleep here is racy and fragile. What we need here is:
+			// wait long enough for the pod to be reported Ready, BUT wait for a fixed
+			// amount of time so we have restarts - which we check later in the flow.
+			// A probably better approach would be to trigger restart from the outside
+			// (ExecCommandOnContainer?)
+			podRECMD := "devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep 1m"
 			pod1 := f.PodClient().CreateSync(makeBusyboxPod(resourceName, podRECMD))
 			deviceIDRE := "stub devices: (Dev-[0-9]+)"
 			devID1 := parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
-			gomega.Expect(devID1).To(gomega.Not(gomega.Equal("")))
+			gomega.Expect(devID1).ToNot(gomega.BeEmpty())
 
 			v1alphaPodResources, err := getV1alpha1NodeDevices()
 			framework.ExpectNoError(err)
